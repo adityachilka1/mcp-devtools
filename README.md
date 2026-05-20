@@ -10,7 +10,8 @@ Stop tailing logs. See every tool call your agent makes, why it failed, how long
 [![license](https://img.shields.io/npm/l/mcp-devtools?style=flat-square&color=000)](./LICENSE)
 [![ci](https://img.shields.io/github/actions/workflow/status/adityachilka1/mcp-devtools/ci.yml?style=flat-square&label=ci&color=000)](https://github.com/adityachilka1/mcp-devtools/actions)
 [![stars](https://img.shields.io/github/stars/adityachilka1/mcp-devtools?style=flat-square&color=000)](https://github.com/adityachilka1/mcp-devtools/stargazers)
-[![discord](https://img.shields.io/badge/discord-join-000?style=flat-square)](https://discord.gg/your-invite)
+<!-- Discord server coming soon — open an issue or Discussion for now -->
+
 
 <sub>Inspect · Profile · Replay · Diff</sub>
 
@@ -119,19 +120,16 @@ All three follow the same wrapper pattern — point your client at `mcp-devtools
 
 ## Roadmap
 
-- [x] stdio proxy
-- [x] Browser UI: timeline + tool view
-- [x] Schema explorer
-- [ ] Streamable HTTP proxy *(v0.2, in progress)*
-- [ ] Replay with diff
-- [ ] OpenTelemetry export
-- [ ] VS Code extension
-- [ ] Cost dashboards across providers
-- [ ] Multi-server "topology" view
+See [ROADMAP.md](./ROADMAP.md) for the full picture. The short version:
+
+- [x] **v0.1** — stdio proxy, recorder, embed API, browser UI
+- [ ] **v0.1.x** — `--quiet`, color-coded timeline, signed binaries, Bun support
+- [ ] **v0.2** — streamable HTTP transport, replay with diff, schema explorer
+- [ ] **v0.3** — OpenTelemetry export, VS Code extension, cost dashboard
 
 ## Contributing
 
-We love contributions — see [CONTRIBUTING.md](./CONTRIBUTING.md). Good first issues are labeled [`good-first-issue`](https://github.com/adityachilka1/mcp-devtools/labels/good-first-issue). Hop in the [Discord](https://discord.gg/your-invite) before you start anything ambitious.
+We love contributions — see [CONTRIBUTING.md](./CONTRIBUTING.md). Good first issues are labeled [`good-first-issue`](https://github.com/adityachilka1/mcp-devtools/labels/good-first-issue). Open an issue or [start a Discussion](https://github.com/adityachilka1/mcp-devtools/discussions) before anything ambitious — Discord server coming soon.
 
 ## Acknowledgements
 

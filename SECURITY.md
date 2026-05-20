@@ -7,7 +7,7 @@ We take security reports seriously. `mcp-devtools` runs locally and proxies the 
 **Do not open a public issue.** Instead, use one of the channels below.
 
 - **Preferred — GitHub private vulnerability reporting.** Visit the [Security tab](https://github.com/adityachilka1/mcp-devtools/security) of this repository and click *Report a vulnerability*. This creates a private advisory that only the maintainers can see.
-- **Backup — email.** `security@your-domain.example` *(replace with your actual address before publishing)*. Use the subject line `[security] mcp-devtools` and include reproduction steps. We acknowledge within 72 hours and aim to ship a patch within 14 days of triage.
+- **Backup — email.** `aditya@rapidcircuitry.com` with subject line `[security] mcp-devtools`. Include reproduction steps. We acknowledge within 72 hours and aim to ship a patch within 14 days of triage.
 
 When you report, please include:
 
