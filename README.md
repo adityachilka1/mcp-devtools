@@ -107,6 +107,16 @@ mcp-devtools open session.mcptrace      # opens the UI on the recorded trace
 
 Single binary. No daemon. No cloud. No login.
 
+## Integration guides
+
+Step-by-step setup for popular MCP clients:
+
+- [Claude Desktop](./docs/integrations/claude-desktop.md)
+- [Cursor](./docs/integrations/cursor.md)
+- [Cline (VS Code)](./docs/integrations/cline.md)
+
+All three follow the same wrapper pattern — point your client at `mcp-devtools proxy` instead of your real server, and the inspector picks up everything.
+
 ## Roadmap
 
 - [x] stdio proxy
