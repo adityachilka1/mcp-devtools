@@ -16,10 +16,10 @@ jobs:
         node: [20, 22]
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v4
         with:
           version: 9
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
           cache: pnpm
@@ -28,3 +28,24 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm build
+
+  # Bun is run separately because the install/test/build commands differ.
+  # We don't want a Bun failure to block Node, and we don't want Node to skip
+  # if Bun is flaky on a given runner image — hence its own job, not a matrix
+  # entry. Tracked for v0.1.x in #15.
+  test-bun:
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true   # informational until we promise Bun support in v0.2
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bunx tsc --noEmit
+      - run: bunx vitest run
+      - run: bunx tsup
