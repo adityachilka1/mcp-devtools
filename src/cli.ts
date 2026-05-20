@@ -6,10 +6,14 @@
  *   record    record a session to a .mcptrace file
  *   open      open a previously recorded .mcptrace file in the UI
  *   version   print version
+ *
+ * Global flags:
+ *   --quiet   suppress informational logs (warnings and errors still print)
  */
 import { cac } from "cac";
 import { startProxy } from "./proxy.js";
 import { startRecorder } from "./recorder.js";
+import { setQuiet } from "./util/log.js";
 import { validatePort } from "./util/validate-port.js";
 import { openTrace } from "./viewer.js";
 
@@ -25,7 +29,9 @@ cli
   .option("--port <port>", "Port for the UI and proxy endpoint", { default: 7456 })
   .option("--transport <type>", "stdio | http", { default: "stdio" })
   .option("--no-open", "Don't auto-open the browser")
+  .option("--quiet", "Suppress informational logs")
   .action(async (opts) => {
+    setQuiet(!!opts.quiet);
     if (!opts.upstream) {
       console.error("error: --upstream is required");
       process.exit(1);
@@ -47,7 +53,9 @@ cli
   .command("record", "Record an MCP session to disk")
   .option("--upstream <cmd>", "Command that launches the upstream MCP server")
   .option("--out <path>", "Output file", { default: "session.mcptrace" })
+  .option("--quiet", "Suppress informational logs")
   .action(async (opts) => {
+    setQuiet(!!opts.quiet);
     if (!opts.upstream) {
       console.error("error: --upstream is required");
       process.exit(1);
@@ -58,7 +66,9 @@ cli
 cli
   .command("open <file>", "Open a recorded .mcptrace file in the UI")
   .option("--port <port>", "Port for the UI", { default: 7456 })
+  .option("--quiet", "Suppress informational logs")
   .action(async (file: string, opts) => {
+    setQuiet(!!opts.quiet);
     const port = validatePort(opts.port);
     if (!port.ok) {
       console.error(port.message);
