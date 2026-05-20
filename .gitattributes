@@ -1,0 +1,19 @@
+# Force LF line endings for all text files so Windows CI runners don't
+# trip up biome/eslint/prettier with CRLF mismatches.
+* text=auto eol=lf
+
+# Explicit overrides for binary-ish or platform-specific files.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mcptrace binary
+*.gz binary
+
+# Shell scripts must stay LF for Bash on Linux/macOS.
+*.sh text eol=lf
+
+# Windows batch files (none here today, but future-proof).
+*.bat text eol=crlf
+*.cmd text eol=crlf
