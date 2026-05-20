@@ -11,5 +11,3 @@ coverage
 
 # pnpm leftover temp files
 _tmp_*
-# deferred workflows folder
-.deferred-workflows/
