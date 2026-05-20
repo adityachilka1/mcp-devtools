@@ -6,8 +6,8 @@
 
 Stop tailing logs. See every tool call your agent makes, why it failed, how long it took, and what it cost — all in a local browser window.
 
-[![npm](https://img.shields.io/npm/v/mcp-devtools?style=flat-square&color=000)](https://www.npmjs.com/package/mcp-devtools)
-[![license](https://img.shields.io/npm/l/mcp-devtools?style=flat-square&color=000)](./LICENSE)
+[![npm](https://img.shields.io/npm/v/@adityachilka/mcp-devtools?style=flat-square&color=000)](https://www.npmjs.com/package/@adityachilka/mcp-devtools)
+[![license](https://img.shields.io/npm/l/@adityachilka/mcp-devtools?style=flat-square&color=000)](./LICENSE)
 [![ci](https://img.shields.io/github/actions/workflow/status/adityachilka1/mcp-devtools/ci.yml?style=flat-square&label=ci&color=000)](https://github.com/adityachilka1/mcp-devtools/actions)
 [![stars](https://img.shields.io/github/stars/adityachilka1/mcp-devtools?style=flat-square&color=000)](https://github.com/adityachilka1/mcp-devtools/stargazers)
 <!-- Discord server coming soon — open an issue or Discussion for now -->
@@ -30,9 +30,9 @@ You're building an MCP server (or just running one) and something is off — the
 ## Install
 
 ```bash
-npm install -g mcp-devtools
+npm install -g @adityachilka/mcp-devtools
 # or
-pnpm add -g mcp-devtools
+pnpm add -g @adityachilka/mcp-devtools
 ```
 
 ## Quick start — proxy mode (recommended)
