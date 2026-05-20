@@ -13,6 +13,7 @@
         --fg: #e6e6e6;
         --muted: #8a8a8a;
         --accent: #6ee7b7;
+        --warn: #fbbf24;
         --error: #f87171;
         font-family: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
       }
@@ -27,18 +28,58 @@
       header .spacer { flex: 1; }
       header .stat { color: var(--muted); font-size: 11px; }
       main { display: grid; grid-template-columns: 360px 1fr; min-height: 0; }
-      .timeline { border-right: 1px solid var(--border); overflow-y: auto; background: var(--panel); }
-      .row { padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 12px; }
+      .timeline { border-right: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+      .filter-bar {
+        display: flex; align-items: center; gap: 8px;
+        padding: 8px 12px; border-bottom: 1px solid var(--border);
+        background: #0e0e0e;
+      }
+      .filter-bar input {
+        flex: 1; background: #060606; color: var(--fg);
+        border: 1px solid var(--border); border-radius: 4px;
+        padding: 6px 10px; font-family: inherit; font-size: 12px;
+      }
+      .filter-bar input:focus { outline: none; border-color: var(--accent); }
+      .filter-bar .count { color: var(--muted); font-size: 11px; white-space: nowrap; }
+      .rows { flex: 1; overflow-y: auto; }
+      .row {
+        padding: 10px 14px; border-bottom: 1px solid var(--border);
+        cursor: pointer; font-size: 12px; position: relative;
+        border-left: 3px solid transparent;
+      }
       .row:hover { background: #161616; }
       .row.selected { background: #1c1c1c; }
+      /* Classification tints — subtle left border + tiny bg tint */
+      .row.req      { border-left-color: var(--warn);   background-color: rgba(251, 191, 36, 0.04); }
+      .row.resp-ok  { border-left-color: var(--accent); background-color: rgba(110, 231, 183, 0.04); }
+      .row.resp-err { border-left-color: var(--error);  background-color: rgba(248, 113, 113, 0.08); }
+      .row.notif    { border-left-color: var(--muted);  background-color: rgba(138, 138, 138, 0.03); }
+      .row.selected.req      { background: #261d10; }
+      .row.selected.resp-ok  { background: #102621; }
+      .row.selected.resp-err { background: #2a1414; }
+      .row.selected.notif    { background: #1c1c1c; }
       .row .dir { display: inline-block; width: 24px; color: var(--muted); }
-      .row.out .dir { color: #fbbf24; }
+      .row.out .dir { color: var(--warn); }
       .row.in  .dir { color: var(--accent); }
-      .row.err .dir { color: var(--error); }
+      .row.in.resp-err .dir { color: var(--error); }
       .row .method { font-weight: 600; }
       .row .lat { float: right; color: var(--muted); }
-      .detail { padding: 18px 22px; overflow: auto; }
-      pre { background: #060606; border: 1px solid var(--border); padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 12px; }
+      .row.hidden { display: none; }
+      .detail { padding: 0; overflow: auto; display: flex; flex-direction: column; min-height: 0; }
+      .detail-bar {
+        display: flex; align-items: center; gap: 8px;
+        padding: 10px 22px; border-bottom: 1px solid var(--border);
+        background: #0e0e0e;
+      }
+      .detail-bar .label { color: var(--muted); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; flex: 1; }
+      .detail-bar button {
+        background: #1a1a1a; color: var(--fg); border: 1px solid var(--border);
+        border-radius: 4px; padding: 6px 12px; font: inherit; font-size: 11px; cursor: pointer;
+      }
+      .detail-bar button:hover { background: #222; border-color: var(--accent); }
+      .detail-bar button.flash { background: var(--accent); color: #000; border-color: var(--accent); }
+      .detail-body { padding: 18px 22px; overflow: auto; flex: 1; }
+      pre { background: #060606; border: 1px solid var(--border); padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 12px; margin: 0; }
       .empty { color: var(--muted); padding: 24px; text-align: center; }
     </style>
   </head>
@@ -50,19 +91,29 @@
       <span class="stat" id="stat-frames">0 frames</span>
     </header>
     <main>
-      <div class="timeline" id="timeline"></div>
+      <div class="timeline">
+        <div class="filter-bar">
+          <input id="filter" type="search" placeholder="Filter by method or body — Esc to clear" autocomplete="off" spellcheck="false" />
+          <span class="count" id="filter-count"></span>
+        </div>
+        <div class="rows" id="rows"></div>
+      </div>
       <div class="detail" id="detail">
         <div class="empty">Select a frame to inspect.</div>
       </div>
     </main>
     <script>
-      // Minimal inspector — the v0.1 surface. The React UI lives behind a flag
-      // until the schema explorer and replay views are ready.
-      const timeline = document.getElementById("timeline");
+      // Minimal inspector — v0.1.x. The React UI replaces this once the
+      // schema explorer and replay views are ready (v0.2).
+      const rowsEl   = document.getElementById("rows");
       const detail   = document.getElementById("detail");
       const stat     = document.getElementById("stat-frames");
+      const filter   = document.getElementById("filter");
+      const fcount   = document.getElementById("filter-count");
+
       const frames = [];
       let selected = null;
+      let filterStr = "";
 
       function classify(f) {
         if (f.frame._parseError) return { kind: "malformed" };
@@ -73,31 +124,105 @@
         return { kind: "malformed" };
       }
 
+      function rowClass(f) {
+        const c = classify(f);
+        const cls = ["row", f.direction];
+        if (c.kind === "request")       cls.push("req");
+        else if (c.kind === "response") cls.push(c.isError ? "resp-err" : "resp-ok");
+        else if (c.kind === "notification") cls.push("notif");
+        return cls;
+      }
+
+      function rowLabel(f) {
+        const c = classify(f);
+        if (c.kind === "request") return c.method;
+        if (c.kind === "response") return c.isError ? `← #${c.id} · error` : `← #${c.id}`;
+        if (c.kind === "notification") return c.method;
+        return "(malformed)";
+      }
+
+      function matchesFilter(f) {
+        if (!filterStr) return true;
+        const c = classify(f);
+        const hay = [
+          c.method ?? "",
+          String(c.id ?? ""),
+          JSON.stringify(f.frame),
+        ].join(" ").toLowerCase();
+        return hay.includes(filterStr);
+      }
+
       function render() {
-        timeline.innerHTML = frames.map((f, i) => {
-          const c = classify(f);
-          const cls = ["row", f.direction];
-          if (c.kind === "response" && c.isError) cls.push("err");
+        let shown = 0;
+        rowsEl.innerHTML = frames.map((f, i) => {
+          const visible = matchesFilter(f);
+          if (visible) shown++;
+          const cls = rowClass(f);
           if (i === selected) cls.push("selected");
-          const label = c.method || (c.kind === "response" ? `← #${c.id}` : c.kind);
+          if (!visible) cls.push("hidden");
           return `<div class="${cls.join(" ")}" data-i="${i}">
             <span class="dir">${f.direction === "in" ? "←" : "→"}</span>
-            <span class="method">${label}</span>
+            <span class="method">${escapeHtml(rowLabel(f))}</span>
           </div>`;
         }).join("");
         stat.textContent = `${frames.length} frame${frames.length === 1 ? "" : "s"}`;
-        Array.from(timeline.children).forEach((el) => {
+        fcount.textContent = filterStr ? `${shown}/${frames.length}` : "";
+        for (const el of rowsEl.children) {
           el.addEventListener("click", () => {
             selected = Number(el.dataset.i);
             render();
-            detail.innerHTML = `<pre>${escapeHtml(JSON.stringify(frames[selected].frame, null, 2))}</pre>`;
+            showDetail(frames[selected]);
           });
+        }
+      }
+
+      function showDetail(f) {
+        const json = JSON.stringify(f.frame, null, 2);
+        detail.innerHTML = `
+          <div class="detail-bar">
+            <span class="label">${escapeHtml(f.direction === "in" ? "server → client" : "client → server")}</span>
+            <button id="copy-btn" title="Copy this frame as JSON">Copy as JSON</button>
+          </div>
+          <div class="detail-body"><pre>${escapeHtml(json)}</pre></div>
+        `;
+        const btn = document.getElementById("copy-btn");
+        btn.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(json);
+            const original = btn.textContent;
+            btn.textContent = "Copied ✓";
+            btn.classList.add("flash");
+            setTimeout(() => {
+              btn.textContent = original;
+              btn.classList.remove("flash");
+            }, 1200);
+          } catch (err) {
+            btn.textContent = "Clipboard blocked";
+            setTimeout(() => (btn.textContent = "Copy as JSON"), 1500);
+          }
         });
       }
 
       function escapeHtml(s) {
-        return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+        return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
       }
+
+      // Filter input — debounced lightly so typing isn't laggy on big sessions.
+      let filterTimer;
+      filter.addEventListener("input", (e) => {
+        clearTimeout(filterTimer);
+        filterTimer = setTimeout(() => {
+          filterStr = e.target.value.trim().toLowerCase();
+          render();
+        }, 80);
+      });
+      filter.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          filter.value = "";
+          filterStr = "";
+          render();
+        }
+      });
 
       const ws = new WebSocket(`ws://${location.host}/ws`);
       ws.onmessage = (ev) => {
