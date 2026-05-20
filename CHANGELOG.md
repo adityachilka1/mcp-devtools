@@ -4,6 +4,7 @@ All notable changes to `mcp-devtools` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- ui: color-coded timeline rows by classification (#12), 'Copy as JSON' button in detail view (#13), live filter input at top of timeline (#24).
 - ci: Bun runtime smoke job added (informational, continues-on-error pending v0.2 promise).
 - cli: validate `--port` in `proxy` and `open` with clear range errors.
 
