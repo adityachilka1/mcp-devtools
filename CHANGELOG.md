@@ -4,6 +4,8 @@ All notable changes to `mcp-devtools` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- release: cross-platform single-binary builds (Linux/macOS/Windows × x64/arm64) attached to GitHub releases via Bun --compile. (#22)
+- chore: fix `bin` field for npm 11 strict validation — was being silently stripped on publish.
 - npm: package published as `@adityachilka/mcp-devtools` (scoped) — npm's similarity check blocked the unscoped name. The CLI command, binary, and GitHub repo stay `mcp-devtools`.
 - cli: `--quiet` flag on `proxy`, `record`, and `open` suppresses informational logs while preserving warnings and errors. (#11)
 - ui: color-coded timeline rows by classification (#12), 'Copy as JSON' button in detail view (#13), live filter input at top of timeline (#24).
