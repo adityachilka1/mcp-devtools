@@ -4,5 +4,5 @@ import kleur from "kleur";
 export const log = {
   info: (msg: string) => process.stderr.write(`${kleur.dim("mcp-devtools")} ${msg}\n`),
   warn: (msg: string) => process.stderr.write(`${kleur.yellow("warn")} ${msg}\n`),
-  err:  (msg: string) => process.stderr.write(`${kleur.red("error")} ${msg}\n`),
+  err: (msg: string) => process.stderr.write(`${kleur.red("error")} ${msg}\n`),
 };

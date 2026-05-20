@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 /**
  * Recorder mode — same proxy plumbing but skips the UI and writes a
  * `.mcptrace` (gzipped JSONL) artifact instead. Designed to be replayable
@@ -5,7 +6,6 @@
  */
 import { createWriteStream } from "node:fs";
 import { createGzip } from "node:zlib";
-import { spawn } from "node:child_process";
 import { parseFrames } from "./jsonrpc.js";
 import { log } from "./util/log.js";
 

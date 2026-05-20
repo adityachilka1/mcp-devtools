@@ -1,16 +1,16 @@
+import { EventEmitter } from "node:events";
 /**
  * Open a previously recorded `.mcptrace` file in the inspector UI.
  * Replays frames into a fresh TraceStore in chronological order and serves
  * the UI in read-only mode.
  */
 import { createReadStream } from "node:fs";
-import { createGunzip } from "node:zlib";
 import { createInterface } from "node:readline";
-import { EventEmitter } from "node:events";
+import { createGunzip } from "node:zlib";
 import { TraceStore } from "./trace-store.js";
 import { startUiServer } from "./ui-server.js";
-import { openBrowserAt } from "./util/open.js";
 import { log } from "./util/log.js";
+import { openBrowserAt } from "./util/open.js";
 
 export interface TraceViewerOptions {
   tracePath: string;

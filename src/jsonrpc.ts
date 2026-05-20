@@ -38,22 +38,26 @@ let pending = "";
 export function parseFrames(chunk: Buffer): JsonRpcFrame[] {
   pending += chunk.toString("utf8");
   const frames: JsonRpcFrame[] = [];
-  let nl: number;
-  while ((nl = pending.indexOf("\n")) !== -1) {
+  let nl = pending.indexOf("\n");
+  while (nl !== -1) {
     const line = pending.slice(0, nl).trim();
     pending = pending.slice(nl + 1);
-    if (!line) continue;
-    try {
-      frames.push(JSON.parse(line));
-    } catch (err) {
-      frames.push({ _raw: line, _parseError: (err as Error).message });
+    if (line) {
+      try {
+        frames.push(JSON.parse(line));
+      } catch (err) {
+        frames.push({ _raw: line, _parseError: (err as Error).message });
+      }
     }
+    nl = pending.indexOf("\n");
   }
   return frames;
 }
 
 /** Helper used by the UI to classify a frame for display. */
-export function classify(f: JsonRpcFrame):
+export function classify(
+  f: JsonRpcFrame,
+):
   | { kind: "request"; method: string; id: number | string }
   | { kind: "response"; id: number | string; isError: boolean }
   | { kind: "notification"; method: string }

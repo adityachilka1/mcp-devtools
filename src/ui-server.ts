@@ -1,13 +1,13 @@
+import type { EventEmitter } from "node:events";
+import { dirname, join } from "node:path";
 /**
  * Local UI server. Serves the static browser bundle from `ui/` and exposes a
  * WebSocket at `/ws` that streams new frames to the inspector in real time.
  */
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
-import fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import websocketPlugin from "@fastify/websocket";
-import type { EventEmitter } from "node:events";
+import fastify from "fastify";
 import type { TraceStore } from "./trace-store.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));

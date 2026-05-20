@@ -1,11 +1,9 @@
-import { describe, it, expect } from "vitest";
-import { parseFrames, classify } from "./jsonrpc.js";
+import { describe, expect, it } from "vitest";
+import { classify, parseFrames } from "./jsonrpc.js";
 
 describe("parseFrames", () => {
   it("parses a single complete frame", () => {
-    const buf = Buffer.from(
-      `{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n`,
-    );
+    const buf = Buffer.from(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}\n`);
     const out = parseFrames(buf);
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({ id: 1, method: "tools/list" });
@@ -27,11 +25,8 @@ describe("parseFrames", () => {
 
 describe("classify", () => {
   it("identifies requests, responses, notifications", () => {
-    expect(classify({ jsonrpc: "2.0", id: 1, method: "ping" }).kind)
-      .toBe("request");
-    expect(classify({ jsonrpc: "2.0", id: 1, result: {} }).kind)
-      .toBe("response");
-    expect(classify({ jsonrpc: "2.0", method: "notifications/x" }).kind)
-      .toBe("notification");
+    expect(classify({ jsonrpc: "2.0", id: 1, method: "ping" }).kind).toBe("request");
+    expect(classify({ jsonrpc: "2.0", id: 1, result: {} }).kind).toBe("response");
+    expect(classify({ jsonrpc: "2.0", method: "notifications/x" }).kind).toBe("notification");
   });
 });

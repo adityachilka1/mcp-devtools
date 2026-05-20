@@ -10,13 +10,13 @@
  * timestamp, and a monotonically-increasing sequence number. Semantic
  * interpretation (e.g. "this is a tools/call") happens in the UI layer.
  */
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { startUiServer } from "./ui-server.js";
-import { TraceStore } from "./trace-store.js";
 import { parseFrames } from "./jsonrpc.js";
-import { openBrowserAt } from "./util/open.js";
+import { TraceStore } from "./trace-store.js";
+import { startUiServer } from "./ui-server.js";
 import { log } from "./util/log.js";
+import { openBrowserAt } from "./util/open.js";
 
 export interface ProxyOptions {
   upstreamCommand: string;
