@@ -1,16 +1,27 @@
 /**
- * Embed mode: attach the inspector UI to an MCP server you already have.
+ * Embed the inspector into your own MCP server.
  *
- *   import { devtools } from "mcp-devtools/embed";
- *   devtools.attach(server, { port: 7456 });
+ * Two APIs:
  *
- * Works by wrapping the server's transport so that every send/receive is also
- * recorded in the local TraceStore that backs the UI.
+ *   `devtools.wrap(transport, { port })`
+ *     The recommended modern API. Wrap a transport BEFORE you pass it to
+ *     `server.connect(transport)`. Works with the official
+ *     `@modelcontextprotocol/sdk` (StdioServerTransport, SSEServerTransport,
+ *     StreamableHTTPServerTransport) and any structurally-compatible custom
+ *     transport. No runtime dependency on the SDK.
  *
- * Note: we intentionally use a structural type for the server parameter so we
- * don't take a hard runtime dependency on the @modelcontextprotocol/sdk
- * package — the inspector works with any object that exposes a transport with
- * `onMessage` and `send` hooks.
+ *     ```ts
+ *     import { devtools } from "mcp-devtools/embed";
+ *     import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio";
+ *
+ *     const transport = await devtools.wrap(new StdioServerTransport(), { port: 7456 });
+ *     await server.connect(transport);
+ *     ```
+ *
+ *   `devtools.attach(server, { port })`
+ *     Legacy probe-based API kept for v0.1.x backward compatibility. Looks
+ *     for `server._transport` and wraps it if present. Prefer `wrap` for new
+ *     code — `attach` is removed in v0.2.
  */
 import { EventEmitter } from "node:events";
 import { TraceStore } from "./trace-store.js";
@@ -18,45 +29,118 @@ import { startUiServer } from "./ui-server.js";
 import { log } from "./util/log.js";
 
 export interface EmbedOptions {
+  /** UI server port. Defaults to 7456. */
   port?: number;
-  openBrowser?: boolean;
 }
 
-/** Structural interface — works with the official SDK's `Server` or any custom one. */
-export interface AttachableServer {
-  // The SDK exposes the transport on a (currently private) `_transport` field.
-  // We probe for it gracefully and degrade to no-op if it isn't there.
-  _transport?: {
-    onMessage: (m: unknown) => void;
-    send: (m: unknown) => void;
-  };
+/**
+ * Structural shape of an MCP server transport. Matches the public surface of
+ * `@modelcontextprotocol/sdk`'s transports without taking a runtime
+ * dependency on the SDK.
+ */
+export interface McpTransportLike {
+  onMessage?: ((msg: unknown) => void) | undefined;
+  send: (msg: unknown) => Promise<void> | void;
+}
+
+/** Per-port UI singleton so multiple wraps on the same port share one UI. */
+const uiByPort = new Map<number, { store: TraceStore; events: EventEmitter }>();
+
+async function ensureUi(port: number) {
+  const cached = uiByPort.get(port);
+  if (cached) return cached;
+  const store = new TraceStore();
+  const events = new EventEmitter();
+  await startUiServer({ port, store, events });
+  const state = { store, events };
+  uiByPort.set(port, state);
+  return state;
+}
+
+const WRAPPED_FLAG = Symbol.for("mcp-devtools.wrapped");
+
+/**
+ * Wrap an MCP transport so every frame it sends and receives is recorded by
+ * the inspector. Returns the same transport object (mutated). Safe to call
+ * BEFORE `server.connect(transport)` — the SDK Server's assignment of
+ * `transport.onMessage` is intercepted by our setter and routed through the
+ * recorder.
+ */
+async function wrap<T extends McpTransportLike>(transport: T, opts: EmbedOptions = {}): Promise<T> {
+  const flagged = transport as T & { [WRAPPED_FLAG]?: true };
+  if (flagged[WRAPPED_FLAG]) {
+    log.warn("embed.wrap: transport already wrapped; skipping double-wrap");
+    return transport;
+  }
+
+  const port = opts.port ?? 7456;
+  const state = await ensureUi(port);
+
+  // ── outgoing (server → client) — wrap send() ─────────────────────────────
+  const originalSend = transport.send.bind(transport);
+  transport.send = ((msg: unknown) => {
+    const id = state.store.record({ direction: "in", frame: msg as never });
+    state.events.emit("frame", id);
+    return originalSend(msg);
+  }) as T["send"];
+
+  // ── incoming (client → server) — intercept onMessage assignment ──────────
+  // The SDK Server assigns `transport.onMessage = handler` inside its
+  // `connect(transport)` call. We replace the property with a getter that
+  // returns a wrapped handler, so the transport's underlying read loop
+  // (calling `this.onMessage(msg)`) goes through our recording side-effect
+  // before reaching the user's handler.
+  let userHandler: ((msg: unknown) => void) | undefined = transport.onMessage;
+  Object.defineProperty(transport, "onMessage", {
+    configurable: true,
+    enumerable: true,
+    get() {
+      if (!userHandler) return undefined;
+      return (msg: unknown) => {
+        const id = state.store.record({ direction: "out", frame: msg as never });
+        state.events.emit("frame", id);
+        return userHandler!(msg);
+      };
+    },
+    set(handler: ((msg: unknown) => void) | undefined) {
+      userHandler = handler;
+    },
+  });
+
+  Object.defineProperty(transport, WRAPPED_FLAG, {
+    value: true,
+    enumerable: false,
+    configurable: false,
+  });
+
+  log.info(`inspector → http://localhost:${port}/inspect`);
+  return transport;
+}
+
+/**
+ * Legacy probe-based attach. Kept for v0.1.x users who already wrote
+ * `devtools.attach(server)` before `wrap` existed. Internally just calls
+ * `wrap(server._transport)` if the field is present, otherwise spins up the
+ * UI in standalone mode with a warning. Scheduled for removal in v0.2.
+ *
+ * @deprecated Use `devtools.wrap(transport)` before `server.connect(transport)` instead.
+ */
+async function attach(
+  server: { _transport?: McpTransportLike },
+  opts: EmbedOptions = {},
+): Promise<void> {
+  if (server._transport) {
+    await wrap(server._transport, opts);
+    return;
+  }
+  log.warn(
+    "embed.attach: server has no `_transport`; recording disabled. " +
+      "Use `devtools.wrap(transport)` before `server.connect(transport)` instead.",
+  );
+  await ensureUi(opts.port ?? 7456);
 }
 
 export const devtools = {
-  async attach(server: AttachableServer, opts: EmbedOptions = {}): Promise<void> {
-    const port = opts.port ?? 7456;
-    const store = new TraceStore();
-    const events = new EventEmitter();
-
-    const transport = server._transport;
-    if (transport) {
-      const realOnMessage = transport.onMessage.bind(transport);
-      transport.onMessage = (msg: unknown) => {
-        const id = store.record({ direction: "out", frame: msg as never });
-        events.emit("frame", id);
-        return realOnMessage(msg);
-      };
-      const realSend = transport.send.bind(transport);
-      transport.send = (msg: unknown) => {
-        const id = store.record({ direction: "in", frame: msg as never });
-        events.emit("frame", id);
-        return realSend(msg);
-      };
-    } else {
-      log.warn("embed: server has no `_transport`; recording is disabled");
-    }
-
-    await startUiServer({ port, store, events });
-    log.info(`mcp-devtools embed → http://localhost:${port}/inspect`);
-  },
+  wrap,
+  attach,
 };
