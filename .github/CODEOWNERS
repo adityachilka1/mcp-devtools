@@ -1,0 +1,8 @@
+# Default owner for the whole repo.
+*                       @adityachilka1
+
+# Hot zones where I want a heads-up even on doc PRs.
+/src/proxy.ts           @adityachilka1
+/src/jsonrpc.ts         @adityachilka1
+/.github/workflows/*    @adityachilka1
+/SECURITY.md            @adityachilka1
