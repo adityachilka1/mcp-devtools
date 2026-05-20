@@ -6,17 +6,18 @@ on:
       - "v*"
 
 jobs:
+  # ── npm publish, with provenance ─────────────────────────────────────────
   publish:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      id-token: write
+      id-token: write           # required for npm provenance via OIDC
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v4
         with:
           version: 9
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
@@ -27,6 +28,74 @@ jobs:
       - run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - uses: softprops/action-gh-release@v3
+
+  # ── Cross-platform single-binary builds via Bun --compile ────────────────
+  binaries:
+    needs: publish
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: bun-linux-x64
+            outfile: mcp-devtools-linux-x64
+          - os: ubuntu-24.04-arm
+            target: bun-linux-arm64
+            outfile: mcp-devtools-linux-arm64
+          - os: macos-latest
+            target: bun-darwin-arm64
+            outfile: mcp-devtools-macos-arm64
+          - os: macos-13
+            target: bun-darwin-x64
+            outfile: mcp-devtools-macos-x64
+          - os: windows-latest
+            target: bun-windows-x64
+            outfile: mcp-devtools-windows-x64.exe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bunx tsup
+      # `bun build --compile` produces a single self-contained executable.
+      # It bakes in the Node/Bun runtime so users don't need either installed.
+      - shell: bash
+        run: |
+          bun build \
+            --compile \
+            --target=${{ matrix.target }} \
+            --outfile dist/${{ matrix.outfile }} \
+            ./dist/cli.js
+          ls -la dist/${{ matrix.outfile }}
+      # Attach to the GitHub release that the publish job created.
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ matrix.outfile }}
+          generate_release_notes: true
+
+  # ── GitHub release with notes (only if binaries job completed) ───────────
+  finalize-release:
+    needs: [publish, binaries]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          append_body: true
+          body: |
+            ## Install
+
+            ```bash
+            # npm (requires Node 20+)
+            npm install -g @adityachilka/mcp-devtools
+
+            # OR — download a single binary, no Node required
+            # see Assets below for your platform
+            ```
