@@ -1,5 +1,5 @@
 {
-  "name": "mcp-devtools",
+  "name": "@adityachilka/mcp-devtools",
   "version": "0.1.0",
   "description": "Chrome DevTools for the Model Context Protocol. Inspect, profile, replay, and diff every MCP call your agent makes.",
   "keywords": [
