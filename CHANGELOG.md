@@ -4,6 +4,7 @@ All notable changes to `mcp-devtools` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- cli: new `doctor` subcommand probes an upstream MCP server for protocol compliance (9 baseline checks). Exit 0 on full pass, 1 otherwise.
 - embed: new `devtools.wrap(transport)` API that works with the real `@modelcontextprotocol/sdk` Server. Properly intercepts `onMessage` assignment via getter/setter. Old `devtools.attach(server)` kept as `@deprecated`, scheduled for removal in v0.2. (#23)
 - release: cross-platform single-binary builds (Linux/macOS/Windows × x64/arm64) attached to GitHub releases via Bun --compile. (#22)
 - chore: fix `bin` field for npm 11 strict validation — was being silently stripped on publish.
