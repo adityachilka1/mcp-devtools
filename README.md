@@ -15,6 +15,8 @@ Stop tailing logs. See every tool call your agent makes, why it failed, how long
 
 <sub>Inspect · Profile · Replay · Diff</sub>
 
+![demo](./docs/demo.gif)
+
 </div>
 
 ---
