@@ -5,12 +5,14 @@
  *   proxy     spin up a transparent MCP proxy + browser UI
  *   record    record a session to a .mcptrace file
  *   open      open a previously recorded .mcptrace file in the UI
+ *   doctor    probe an upstream MCP server for spec compliance
  *   version   print version
  *
  * Global flags:
  *   --quiet   suppress informational logs (warnings and errors still print)
  */
 import { cac } from "cac";
+import { printResults, runDoctor } from "./doctor.js";
 import { startProxy } from "./proxy.js";
 import { startRecorder } from "./recorder.js";
 import { setQuiet } from "./util/log.js";
@@ -75,6 +77,26 @@ cli
       process.exit(1);
     }
     await openTrace({ tracePath: file, port: port.value });
+  });
+
+cli
+  .command("doctor", "Probe an upstream MCP server for spec compliance")
+  .option("--upstream <cmd>", "Command that launches the upstream MCP server")
+  .option("--timeout <ms>", "Per-request timeout in ms", { default: 5000 })
+  .option("--quiet", "Suppress informational logs")
+  .action(async (opts) => {
+    setQuiet(!!opts.quiet);
+    if (!opts.upstream) {
+      console.error("error: --upstream is required");
+      process.exit(1);
+    }
+    const results = await runDoctor({
+      upstreamCommand: opts.upstream,
+      timeout: Number(opts.timeout),
+    });
+    printResults(results);
+    const allPassed = results.every((r) => r.passed);
+    process.exit(allPassed ? 0 : 1);
   });
 
 cli.help();
