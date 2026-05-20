@@ -40,4 +40,4 @@ We use [Biome](https://biomejs.dev/) for both lint and format. Run `pnpm format`
 
 ## Reporting security issues
 
-Please email security@your-domain.example instead of opening a public issue. We respond within 72 hours.
+See [SECURITY.md](./SECURITY.md) for the private vulnerability-reporting flow.
