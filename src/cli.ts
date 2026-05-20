@@ -10,6 +10,7 @@
 import { cac } from "cac";
 import { startProxy } from "./proxy.js";
 import { startRecorder } from "./recorder.js";
+import { validatePort } from "./util/validate-port.js";
 import { openTrace } from "./viewer.js";
 
 // Version is replaced at build time. Avoid `import ... with { type: "json" }`
@@ -29,9 +30,14 @@ cli
       console.error("error: --upstream is required");
       process.exit(1);
     }
+    const port = validatePort(opts.port);
+    if (!port.ok) {
+      console.error(port.message);
+      process.exit(1);
+    }
     await startProxy({
       upstreamCommand: opts.upstream,
-      port: Number(opts.port),
+      port: port.value,
       transport: opts.transport,
       openBrowser: opts.open !== false,
     });
@@ -53,7 +59,12 @@ cli
   .command("open <file>", "Open a recorded .mcptrace file in the UI")
   .option("--port <port>", "Port for the UI", { default: 7456 })
   .action(async (file: string, opts) => {
-    await openTrace({ tracePath: file, port: Number(opts.port) });
+    const port = validatePort(opts.port);
+    if (!port.ok) {
+      console.error(port.message);
+      process.exit(1);
+    }
+    await openTrace({ tracePath: file, port: port.value });
   });
 
 cli.help();
