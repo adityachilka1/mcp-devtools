@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>mcp-devtools · inspector</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #0a0a0a;
+        --panel: #111;
+        --border: #1f1f1f;
+        --fg: #e6e6e6;
+        --muted: #8a8a8a;
+        --accent: #6ee7b7;
+        --error: #f87171;
+        font-family: ui-monospace, "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--fg); height: 100vh; display: grid; grid-template-rows: 48px 1fr; }
+      header {
+        display: flex; align-items: center; gap: 12px;
+        padding: 0 16px; border-bottom: 1px solid var(--border);
+        font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase;
+      }
+      header .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+      header .spacer { flex: 1; }
+      header .stat { color: var(--muted); font-size: 11px; }
+      main { display: grid; grid-template-columns: 360px 1fr; min-height: 0; }
+      .timeline { border-right: 1px solid var(--border); overflow-y: auto; background: var(--panel); }
+      .row { padding: 10px 14px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 12px; }
+      .row:hover { background: #161616; }
+      .row.selected { background: #1c1c1c; }
+      .row .dir { display: inline-block; width: 24px; color: var(--muted); }
+      .row.out .dir { color: #fbbf24; }
+      .row.in  .dir { color: var(--accent); }
+      .row.err .dir { color: var(--error); }
+      .row .method { font-weight: 600; }
+      .row .lat { float: right; color: var(--muted); }
+      .detail { padding: 18px 22px; overflow: auto; }
+      pre { background: #060606; border: 1px solid var(--border); padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 12px; }
+      .empty { color: var(--muted); padding: 24px; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span class="dot"></span>
+      <span>mcp-devtools · inspector</span>
+      <span class="spacer"></span>
+      <span class="stat" id="stat-frames">0 frames</span>
+    </header>
+    <main>
+      <div class="timeline" id="timeline"></div>
+      <div class="detail" id="detail">
+        <div class="empty">Select a frame to inspect.</div>
+      </div>
+    </main>
+    <script>
+      // Minimal inspector — the v0.1 surface. The React UI lives behind a flag
+      // until the schema explorer and replay views are ready.
+      const timeline = document.getElementById("timeline");
+      const detail   = document.getElementById("detail");
+      const stat     = document.getElementById("stat-frames");
+      const frames = [];
+      let selected = null;
+
+      function classify(f) {
+        if (f.frame._parseError) return { kind: "malformed" };
+        const fr = f.frame;
+        if (fr.id != null && fr.method) return { kind: "request", method: fr.method, id: fr.id };
+        if (fr.id != null) return { kind: "response", id: fr.id, isError: !!fr.error };
+        if (fr.method) return { kind: "notification", method: fr.method };
+        return { kind: "malformed" };
+      }
+
+      function render() {
+        timeline.innerHTML = frames.map((f, i) => {
+          const c = classify(f);
+          const cls = ["row", f.direction];
+          if (c.kind === "response" && c.isError) cls.push("err");
+          if (i === selected) cls.push("selected");
+          const label = c.method || (c.kind === "response" ? `← #${c.id}` : c.kind);
+          return `<div class="${cls.join(" ")}" data-i="${i}">
+            <span class="dir">${f.direction === "in" ? "←" : "→"}</span>
+            <span class="method">${label}</span>
+          </div>`;
+        }).join("");
+        stat.textContent = `${frames.length} frame${frames.length === 1 ? "" : "s"}`;
+        Array.from(timeline.children).forEach((el) => {
+          el.addEventListener("click", () => {
+            selected = Number(el.dataset.i);
+            render();
+            detail.innerHTML = `<pre>${escapeHtml(JSON.stringify(frames[selected].frame, null, 2))}</pre>`;
+          });
+        });
+      }
+
+      function escapeHtml(s) {
+        return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+      }
+
+      const ws = new WebSocket(`ws://${location.host}/ws`);
+      ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === "frame") {
+          frames.push(...msg.frames);
+          render();
+        }
+      };
+
+      fetch("/api/frames?since=0").then(r => r.json()).then(initial => {
+        frames.push(...initial);
+        render();
+      });
+    </script>
+  </body>
+</html>

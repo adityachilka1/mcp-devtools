@@ -1,0 +1,30 @@
+name: Bug report
+description: Something is broken in mcp-devtools.
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      placeholder: A clear description, plus the exact `mcp-devtools` command you ran.
+    validations:
+      required: true
+  - type: textarea
+    id: trace
+    attributes:
+      label: Reproduction trace
+      description: If possible, attach the `.mcptrace` produced by `mcp-devtools record …`.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: OS
+      options: [macOS, Linux, Windows]
+    validations:
+      required: true

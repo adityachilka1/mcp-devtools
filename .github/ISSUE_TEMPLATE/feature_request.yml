@@ -1,0 +1,16 @@
+name: Feature request
+description: Propose a new capability for mcp-devtools.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Concrete scenario, not "it would be nice to…".
+    validations:
+      required: true
+  - type: textarea
+    id: sketch
+    attributes:
+      label: Sketch of the UX or API
+      description: A CLI invocation, a screenshot, or 5 lines of code is enough.

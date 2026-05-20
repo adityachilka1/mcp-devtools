@@ -1,0 +1,15 @@
+node_modules
+dist
+coverage
+.DS_Store
+*.log
+*.mcptrace
+.env
+.env.local
+.vscode
+.idea
+
+# pnpm leftover temp files
+_tmp_*
+# deferred workflows folder
+.deferred-workflows/
