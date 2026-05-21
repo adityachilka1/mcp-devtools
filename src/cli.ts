@@ -6,12 +6,15 @@
  *   record    record a session to a .mcptrace file
  *   open      open a previously recorded .mcptrace file in the UI
  *   doctor    probe an upstream MCP server for spec compliance
+ *   diff      compare two .mcptrace files structurally
  *   version   print version
  *
  * Global flags:
  *   --quiet   suppress informational logs (warnings and errors still print)
  */
 import { cac } from "cac";
+import kleur from "kleur";
+import { diffFrames, formatDiffReport, readTrace } from "./diff.js";
 import { printResults, runDoctor } from "./doctor.js";
 import { startProxy } from "./proxy.js";
 import { startRecorder } from "./recorder.js";
@@ -19,10 +22,7 @@ import { setQuiet } from "./util/log.js";
 import { validatePort } from "./util/validate-port.js";
 import { openTrace } from "./viewer.js";
 
-// Version is replaced at build time. Avoid `import ... with { type: "json" }`
-// so we don't depend on Node ≥20.10 JSON import attributes inside the bundle.
 const VERSION = "0.1.0";
-
 const cli = cac("mcp-devtools");
 
 cli
@@ -95,8 +95,30 @@ cli
       timeout: Number(opts.timeout),
     });
     printResults(results);
-    const allPassed = results.every((r) => r.passed);
-    process.exit(allPassed ? 0 : 1);
+    process.exit(results.every((r) => r.passed) ? 0 : 1);
+  });
+
+cli
+  .command("diff <baseline> <current>", "Compare two .mcptrace files structurally")
+  .option("--quiet", "Suppress informational logs")
+  .action(async (baselinePath: string, currentPath: string, opts) => {
+    setQuiet(!!opts.quiet);
+    try {
+      const [baseline, current] = await Promise.all([
+        readTrace(baselinePath),
+        readTrace(currentPath),
+      ]);
+      const report = diffFrames(baseline, current);
+      if (report.identical) {
+        process.stdout.write(`${kleur.green("✓")} ${formatDiffReport(report)}\n`);
+        process.exit(0);
+      }
+      process.stdout.write(`${kleur.red("✗")} ${formatDiffReport(report)}\n`);
+      process.exit(1);
+    } catch (err) {
+      process.stderr.write(`${kleur.red("error:")} ${(err as Error).message}\n`);
+      process.exit(1);
+    }
   });
 
 cli.help();
