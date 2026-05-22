@@ -10,6 +10,7 @@ Stop tailing logs. See every tool call your agent makes, why it failed, how long
 [![license](https://img.shields.io/npm/l/@adityachilka/mcp-devtools?style=flat-square&color=000)](./LICENSE)
 [![ci](https://img.shields.io/github/actions/workflow/status/adityachilka1/mcp-devtools/ci.yml?style=flat-square&label=ci&color=000)](https://github.com/adityachilka1/mcp-devtools/actions)
 [![stars](https://img.shields.io/github/stars/adityachilka1/mcp-devtools?style=flat-square&color=000)](https://github.com/adityachilka1/mcp-devtools/stargazers)
+[![contributors](https://img.shields.io/github/contributors/adityachilka1/mcp-devtools?style=flat-square&color=000)](https://github.com/adityachilka1/mcp-devtools/graphs/contributors)
 <!-- Discord server coming soon — open an issue or Discussion for now -->
 
 
