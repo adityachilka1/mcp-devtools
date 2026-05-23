@@ -64,7 +64,18 @@
       .row.in.resp-err .dir { color: var(--error); }
       .row .method { font-weight: 600; }
       .row .lat { float: right; color: var(--muted); }
+      .row .cost {
+        float: right; margin-right: 8px;
+        color: var(--accent); font-size: 11px; opacity: 0.85;
+        font-variant-numeric: tabular-nums;
+      }
+      .row .cost.unknown { color: var(--muted); opacity: 0.6; }
       .row.hidden { display: none; }
+      header .total {
+        color: var(--accent); font-size: 11px;
+        font-variant-numeric: tabular-nums; letter-spacing: 0.04em;
+      }
+      header .total.zero { color: var(--muted); opacity: 0.5; }
       .detail { padding: 0; overflow: auto; display: flex; flex-direction: column; min-height: 0; }
       .detail-bar {
         display: flex; align-items: center; gap: 8px;
@@ -88,6 +99,7 @@
       <span class="dot"></span>
       <span>mcp-devtools · inspector</span>
       <span class="spacer"></span>
+      <span class="total zero" id="stat-cost" title="Sum of cost estimates across all tools/call responses in this session">$0.0000</span>
       <span class="stat" id="stat-frames">0 frames</span>
     </header>
     <main>
@@ -108,12 +120,45 @@
       const rowsEl   = document.getElementById("rows");
       const detail   = document.getElementById("detail");
       const stat     = document.getElementById("stat-frames");
+      const statCost = document.getElementById("stat-cost");
       const filter   = document.getElementById("filter");
       const fcount   = document.getElementById("filter-count");
 
       const frames = [];
       let selected = null;
       let filterStr = "";
+
+      function fmtCost(usd) {
+        if (usd === null || usd === undefined) return null;
+        if (usd >= 0.01) return `$${usd.toFixed(4)}`;
+        if (usd >= 0.0001) return `$${usd.toFixed(5)}`;
+        return `$${usd.toExponential(2)}`;
+      }
+
+      function costBadgeHtml(f) {
+        if (!f.cost) return "";
+        if (f.cost.usd == null) {
+          return `<span class="cost unknown" title="No price for the configured model — pass --model and --pricing-file to enable cost attribution">—</span>`;
+        }
+        const tip =
+          f.cost.basis === "local-seconds"
+            ? `local model · billed by wall-clock seconds`
+            : `${f.cost.inputTokens ?? 0}→${f.cost.outputTokens ?? 0} tokens (chars/4 estimate)`;
+        return `<span class="cost" title="${escapeHtml(tip)}">${fmtCost(f.cost.usd)}</span>`;
+      }
+
+      function updateTotalCost() {
+        let total = 0;
+        let anyKnown = false;
+        for (const f of frames) {
+          if (f.cost && f.cost.usd != null) {
+            total += f.cost.usd;
+            anyKnown = true;
+          }
+        }
+        statCost.textContent = anyKnown ? `$${total.toFixed(4)}` : "$0.0000";
+        statCost.classList.toggle("zero", !anyKnown);
+      }
 
       function classify(f) {
         if (f.frame._parseError) return { kind: "malformed" };
@@ -163,9 +208,11 @@
           return `<div class="${cls.join(" ")}" data-i="${i}">
             <span class="dir">${f.direction === "in" ? "←" : "→"}</span>
             <span class="method">${escapeHtml(rowLabel(f))}</span>
+            ${costBadgeHtml(f)}
           </div>`;
         }).join("");
         stat.textContent = `${frames.length} frame${frames.length === 1 ? "" : "s"}`;
+        updateTotalCost();
         fcount.textContent = filterStr ? `${shown}/${frames.length}` : "";
         for (const el of rowsEl.children) {
           el.addEventListener("click", () => {

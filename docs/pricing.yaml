@@ -1,0 +1,63 @@
+# mcp-devtools pricing table — token costs in USD per 1,000,000 tokens.
+#
+# This file is the source of truth for the built-in price table that the
+# inspector uses to annotate `tools/call` rows with an estimated cost.
+#
+# To override the built-in table without editing this file, pass
+#   mcp-devtools proxy --pricing-file ./my-prices.yaml
+# at the command line, or set MCP_DEVTOOLS_PRICING=./my-prices.yaml in the env.
+#
+# Format
+# ------
+#   <model-id>:
+#     input:  <USD per 1M input tokens>
+#     output: <USD per 1M output tokens>
+#
+# Local models bill on wall-clock time instead of tokens:
+#   <model-id>:
+#     per_second: <USD per second of compute>
+#
+# Model IDs are matched case-insensitively and may use either dashes or dots.
+# An unknown model produces a `cost: null` annotation — no guessing.
+#
+# Numbers below reflect publicly listed list prices as of 2026-05.
+# They are best-effort defaults; supply your own pricing file for accuracy.
+
+# --- Anthropic ---
+claude-opus-4-6:
+  input: 15.00
+  output: 75.00
+claude-sonnet-4-6:
+  input: 3.00
+  output: 15.00
+claude-haiku-4-5:
+  input: 1.00
+  output: 5.00
+
+# --- OpenAI ---
+gpt-5:
+  input: 5.00
+  output: 15.00
+gpt-5-mini:
+  input: 0.40
+  output: 1.60
+gpt-4o:
+  input: 2.50
+  output: 10.00
+gpt-4o-mini:
+  input: 0.15
+  output: 0.60
+
+# --- Google ---
+gemini-2.5-pro:
+  input: 1.25
+  output: 5.00
+gemini-2.5-flash:
+  input: 0.075
+  output: 0.30
+
+# --- Local / self-hosted (per-second compute cost on a typical GPU) ---
+llama-3.3-70b-local:
+  per_second: 0.0008
+mistral-large-local:
+  per_second: 0.0010

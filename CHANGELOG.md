@@ -4,6 +4,7 @@ All notable changes to `mcp-devtools` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+- ui: per-call token cost attribution. New `--model <id>` and `--pricing-file <yaml>` flags on the `proxy` command annotate each `tools/call` response row with a USD estimate (chars/4 token heuristic for cloud models, wall-clock × per-second rate for local models). Session total renders in the header. Unknown models surface a muted `—` badge instead of guessing. Built-in rate table at `docs/pricing.yaml`; the env var `MCP_DEVTOOLS_PRICING` is honored as a fallback. Closes #25.
 - cli: new diff subcommand compares two .mcptrace files at the JSON-RPC frame level. Frame count, direction, method, is-error flag, and full body diff with frame-indexed output. Closes #27.
 - cli: new `doctor` subcommand probes an upstream MCP server for protocol compliance (9 baseline checks). Exit 0 on full pass, 1 otherwise.
 - embed: new `devtools.wrap(transport)` API that works with the real `@modelcontextprotocol/sdk` Server. Properly intercepts `onMessage` assignment via getter/setter. Old `devtools.attach(server)` kept as `@deprecated`, scheduled for removal in v0.2. (#23)
