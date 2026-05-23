@@ -31,6 +31,8 @@ cli
   .option("--port <port>", "Port for the UI and proxy endpoint", { default: 7456 })
   .option("--transport <type>", "stdio | http", { default: "stdio" })
   .option("--no-open", "Don't auto-open the browser")
+  .option("--model <id>", "Active model id for cost attribution (e.g. claude-sonnet-4-6)")
+  .option("--pricing-file <path>", "YAML file of per-token rates; overrides the built-in table")
   .option("--quiet", "Suppress informational logs")
   .action(async (opts) => {
     setQuiet(!!opts.quiet);
@@ -48,6 +50,8 @@ cli
       port: port.value,
       transport: opts.transport,
       openBrowser: opts.open !== false,
+      modelId: opts.model,
+      pricingFile: opts.pricingFile,
     });
   });
 

@@ -41,6 +41,7 @@
   "files": [
     "dist",
     "ui",
+    "docs/pricing.yaml",
     "README.md",
     "LICENSE"
   ],
