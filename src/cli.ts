@@ -15,7 +15,7 @@
 import { cac } from "cac";
 import kleur from "kleur";
 import { diffFrames, formatDiffReport, readTrace } from "./diff.js";
-import { printResults, runDoctor } from "./doctor.js";
+import { printResults, printResultsJson, runDoctor } from "./doctor.js";
 import { startProxy } from "./proxy.js";
 import { startRecorder } from "./recorder.js";
 import { setQuiet } from "./util/log.js";
@@ -112,9 +112,14 @@ cli
   .command("doctor", "Probe an upstream MCP server for spec compliance")
   .option("--upstream <cmd>", "Command that launches the upstream MCP server")
   .option("--timeout <ms>", "Per-request timeout in ms", { default: 5000 })
+  .option("--json", "Emit a single JSON envelope to stdout (no colors, no per-check lines)")
   .option("--quiet", "Suppress informational logs")
   .action(async (opts) => {
-    setQuiet(!!opts.quiet);
+    // When --json is set we want the JSON envelope to be the *only* thing on
+    // stdout — info chatter still goes to stderr but we silence it by default
+    // so `... --json | jq .` Just Works. Users can opt back in with explicit
+    // logging if they ever want it.
+    setQuiet(!!opts.quiet || !!opts.json);
     if (!opts.upstream) {
       console.error("error: --upstream is required");
       process.exit(1);
@@ -123,7 +128,11 @@ cli
       upstreamCommand: opts.upstream,
       timeout: Number(opts.timeout),
     });
-    printResults(results);
+    if (opts.json) {
+      printResultsJson(results, { version: VERSION, upstream: opts.upstream });
+    } else {
+      printResults(results);
+    }
     process.exit(results.every((r) => r.passed) ? 0 : 1);
   });
 

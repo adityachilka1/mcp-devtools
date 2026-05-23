@@ -219,3 +219,58 @@ export function printResults(results: CheckResult[]): void {
   process.stdout.write("\n");
   log.info(`doctor done. ${passed}/${results.length} checks passed.`);
 }
+
+/** Envelope for `doctor --json`. Stable shape — CI consumers depend on it. */
+export interface DoctorJsonReport {
+  version: string;
+  upstream: string;
+  summary: { passed: number; failed: number; total: number };
+  checks: Array<{ name: string; passed: boolean; message?: string }>;
+}
+
+/**
+ * Build the machine-readable envelope for `doctor --json`. Pure function — no
+ * stdout side effects, so it's trivial to test and to embed elsewhere.
+ *
+ * We map the internal `detail` field to `message` in the public envelope: the
+ * external contract is what CI consumers grep on. Fields not actually measured
+ * by `runDoctor` (e.g. per-check `durationMs`) are intentionally omitted; the
+ * envelope only carries what the checks honestly produce today.
+ */
+export function formatResultsJson(
+  results: CheckResult[],
+  opts: { version: string; upstream: string },
+): DoctorJsonReport {
+  const passed = results.filter((r) => r.passed).length;
+  return {
+    version: opts.version,
+    upstream: opts.upstream,
+    summary: {
+      passed,
+      failed: results.length - passed,
+      total: results.length,
+    },
+    checks: results.map((r) => {
+      const out: { name: string; passed: boolean; message?: string } = {
+        name: r.name,
+        passed: r.passed,
+      };
+      if (r.detail !== undefined) out.message = r.detail;
+      return out;
+    }),
+  };
+}
+
+/**
+ * Serialize the JSON envelope and write it to stdout as a single line.
+ * Single-line output keeps `... | jq .` pipelines tidy and avoids the
+ * cosmetic-whitespace question entirely.
+ */
+export function printResultsJson(
+  results: CheckResult[],
+  opts: { version: string; upstream: string },
+): void {
+  const report = formatResultsJson(results, opts);
+  process.stdout.write(`${JSON.stringify(report)}\n`);
+  log.info(`doctor done. ${report.summary.passed}/${report.summary.total} checks passed.`);
+}
