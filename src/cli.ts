@@ -27,12 +27,17 @@ const cli = cac("mcp-devtools");
 
 cli
   .command("proxy", "Start a transparent MCP proxy with a live inspector UI")
-  .option("--upstream <cmd>", "Command that launches the upstream MCP server")
+  .option("--upstream <cmd>", "Command (stdio) or URL (http) for the upstream MCP server")
   .option("--port <port>", "Port for the UI and proxy endpoint", { default: 7456 })
   .option("--transport <type>", "stdio | http", { default: "stdio" })
   .option("--no-open", "Don't auto-open the browser")
   .option("--model <id>", "Active model id for cost attribution (e.g. claude-sonnet-4-6)")
   .option("--pricing-file <path>", "YAML file of per-token rates; overrides the built-in table")
+  .option(
+    "--header <kv>",
+    "Extra HTTP header for the upstream (http transport). Repeatable. Format: 'Name: value'",
+    { type: [String] },
+  )
   .option("--quiet", "Suppress informational logs")
   .action(async (opts) => {
     setQuiet(!!opts.quiet);
@@ -45,6 +50,7 @@ cli
       console.error(port.message);
       process.exit(1);
     }
+    const httpHeaders = parseHeaderFlags(opts.header);
     await startProxy({
       upstreamCommand: opts.upstream,
       port: port.value,
@@ -52,8 +58,27 @@ cli
       openBrowser: opts.open !== false,
       modelId: opts.model,
       pricingFile: opts.pricingFile,
+      httpHeaders,
     });
   });
+
+/** Parse `--header 'Name: value'` flags into a header bag. */
+function parseHeaderFlags(raw: unknown): Record<string, string> | undefined {
+  if (!raw) return undefined;
+  const list = Array.isArray(raw) ? (raw as string[]) : [String(raw)];
+  const out: Record<string, string> = {};
+  for (const item of list) {
+    const idx = item.indexOf(":");
+    if (idx === -1) {
+      console.error(`error: --header expects 'Name: value', got: ${item}`);
+      process.exit(1);
+    }
+    const name = item.slice(0, idx).trim().toLowerCase();
+    const value = item.slice(idx + 1).trim();
+    if (name) out[name] = value;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
 
 cli
   .command("record", "Record an MCP session to disk")

@@ -16,6 +16,7 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CostAnnotator } from "./cost-annotator.js";
+import { HttpTransport } from "./http-transport.js";
 import { parseFrames } from "./jsonrpc.js";
 import { type PricingTable, emptyPricing, loadPricingFromFile } from "./pricing.js";
 import { TraceStore } from "./trace-store.js";
@@ -32,13 +33,14 @@ export interface ProxyOptions {
   modelId?: string;
   /** Optional path to a YAML pricing file overriding the bundled defaults. */
   pricingFile?: string;
+  /**
+   * Extra HTTP headers forwarded to the upstream when `transport: http`.
+   * Typical use: `{ authorization: "Bearer ..." }`.
+   */
+  httpHeaders?: Record<string, string>;
 }
 
 export async function startProxy(opts: ProxyOptions): Promise<void> {
-  if (opts.transport === "http") {
-    throw new Error("HTTP transport is on the v0.2 roadmap. Use stdio for now.");
-  }
-
   const store = new TraceStore();
   const events = new EventEmitter();
   const pricing = loadPricingTable(opts.pricingFile);
@@ -47,6 +49,22 @@ export async function startProxy(opts: ProxyOptions): Promise<void> {
     log.info(`cost attribution → model=${opts.modelId} (rates loaded: ${pricing.rates.size})`);
   }
 
+  // Spin up the UI server up-front — both transports use it identically.
+  await startUiServer({ port: opts.port, store, events, annotator });
+  log.info(`inspector ready → http://localhost:${opts.port}/inspect`);
+
+  if (opts.transport === "http") {
+    await runHttpTransport(opts, store, events);
+  } else {
+    runStdioTransport(opts, store, events);
+  }
+
+  if (opts.openBrowser) {
+    await openBrowserAt(`http://localhost:${opts.port}/inspect`);
+  }
+}
+
+function runStdioTransport(opts: ProxyOptions, store: TraceStore, events: EventEmitter): void {
   // Spawn the upstream server.
   const parts = splitCommand(opts.upstreamCommand);
   const cmd = parts[0];
@@ -86,14 +104,50 @@ export async function startProxy(opts: ProxyOptions): Promise<void> {
     log.info(`upstream exited with code ${code}`);
     process.exit(code ?? 0);
   });
+}
 
-  // Spin up the UI server.
-  await startUiServer({ port: opts.port, store, events, annotator });
-  log.info(`inspector ready → http://localhost:${opts.port}/inspect`);
-
-  if (opts.openBrowser) {
-    await openBrowserAt(`http://localhost:${opts.port}/inspect`);
+/**
+ * HTTP transport: stdio on the user-facing side, HTTP+SSE upstream. We don't
+ * spawn a child process — instead, every parsed JSON-RPC frame from stdin
+ * is POSTed to the upstream URL and the response (JSON or SSE) is written
+ * back to stdout one frame per line.
+ */
+async function runHttpTransport(
+  opts: ProxyOptions,
+  store: TraceStore,
+  events: EventEmitter,
+): Promise<void> {
+  if (!opts.upstreamCommand.startsWith("http://") && !opts.upstreamCommand.startsWith("https://")) {
+    throw new Error(
+      `--transport http requires --upstream to be a URL, got: ${opts.upstreamCommand}`,
+    );
   }
+
+  const transport = new HttpTransport({
+    url: opts.upstreamCommand,
+    extraHeaders: opts.httpHeaders,
+  });
+  log.info(`upstream → ${opts.upstreamCommand} (HTTP)`);
+
+  const sink = {
+    onIncoming(frame: import("./jsonrpc.js").JsonRpcFrame): void {
+      // Write the frame back to the local stdio client AND tag it for the UI.
+      process.stdout.write(`${JSON.stringify(frame)}\n`);
+      const id = store.record({ direction: "in", frame });
+      events.emit("frame", id);
+    },
+  };
+
+  process.stdin.on("data", (chunk) => {
+    for (const frame of parseFrames(chunk)) {
+      const id = store.record({ direction: "out", frame });
+      events.emit("frame", id);
+      transport.sendOutbound(frame, sink).catch((err) => {
+        log.warn(`upstream POST failed: ${(err as Error).message}`);
+      });
+    }
+  });
+  process.stdin.on("end", () => process.exit(0));
 }
 
 function splitCommand(s: string): string[] {
