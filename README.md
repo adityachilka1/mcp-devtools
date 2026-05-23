@@ -83,6 +83,15 @@ mcp-devtools open session.mcptrace      # opens the UI on the recorded trace
 
 `.mcptrace` files are gzipped JSONL — diffable, grep-able, and small.
 
+## Quick start — profile mode
+
+Recorded a session and want to know where the time went? `profile` reports per-method p50/p95/p99 latency and the slowest individual calls — Chrome DevTools Performance tab, for MCP.
+
+```bash
+mcp-devtools profile session.mcptrace
+mcp-devtools profile session.mcptrace --json | jq .
+```
+
 ## Features
 
 | | |

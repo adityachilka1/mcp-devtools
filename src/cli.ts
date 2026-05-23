@@ -7,6 +7,7 @@
  *   open      open a previously recorded .mcptrace file in the UI
  *   doctor    probe an upstream MCP server for spec compliance
  *   diff      compare two .mcptrace files structurally
+ *   profile   per-method latency profiler for a .mcptrace file
  *   version   print version
  *
  * Global flags:
@@ -16,6 +17,7 @@ import { cac } from "cac";
 import kleur from "kleur";
 import { diffFrames, formatDiffReport, readTrace } from "./diff.js";
 import { printResults, printResultsJson, runDoctor } from "./doctor.js";
+import { formatProfile, printProfileJson, profileTrace } from "./profile.js";
 import { startProxy } from "./proxy.js";
 import { startRecorder } from "./recorder.js";
 import { setQuiet } from "./util/log.js";
@@ -153,6 +155,28 @@ cli
       }
       process.stdout.write(`${kleur.red("✗")} ${formatDiffReport(report)}\n`);
       process.exit(1);
+    } catch (err) {
+      process.stderr.write(`${kleur.red("error:")} ${(err as Error).message}\n`);
+      process.exit(1);
+    }
+  });
+
+cli
+  .command("profile <trace>", "Profile per-method latency in a .mcptrace file")
+  .option("--json", "Emit a single JSON envelope to stdout (no colors, no table)")
+  .option("--quiet", "Suppress informational logs")
+  .action(async (tracePath: string, opts) => {
+    // Mirror the doctor convention — --json implies --quiet so the envelope is
+    // the only thing on stdout for `... | jq .` pipelines.
+    setQuiet(!!opts.quiet || !!opts.json);
+    try {
+      const result = await profileTrace(tracePath);
+      if (opts.json) {
+        printProfileJson(result);
+      } else {
+        process.stdout.write(`${formatProfile(result)}\n`);
+      }
+      process.exit(0);
     } catch (err) {
       process.stderr.write(`${kleur.red("error:")} ${(err as Error).message}\n`);
       process.exit(1);
