@@ -92,6 +92,17 @@ mcp-devtools profile session.mcptrace
 mcp-devtools profile session.mcptrace --json | jq .
 ```
 
+## Quick start — serve mode (replay)
+
+Develop and test MCP clients offline. `serve --replay` reads a `.mcptrace` and impersonates the upstream server over stdio: matching requests get the recorded response (with the client's id substituted in), unknown methods get a clean `-32601` so the client sees a protocol-level failure instead of a hang.
+
+```bash
+mcp-devtools serve --replay session.mcptrace             # strict (default)
+mcp-devtools serve --replay session.mcptrace --no-strict # canned { result: {} } for unknown methods
+```
+
+Point your client at this command exactly like it would a real MCP server. Identical recorded sessions become deterministic fixtures for CI.
+
 ## Features
 
 | | |

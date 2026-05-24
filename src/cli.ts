@@ -8,6 +8,7 @@
  *   doctor    probe an upstream MCP server for spec compliance
  *   diff      compare two .mcptrace files structurally
  *   profile   per-method latency profiler for a .mcptrace file
+ *   serve     replay a .mcptrace as a fake MCP server over stdio
  *   version   print version
  *
  * Global flags:
@@ -20,6 +21,7 @@ import { printResults, printResultsJson, runDoctor } from "./doctor.js";
 import { formatProfile, printProfileJson, profileTrace } from "./profile.js";
 import { startProxy } from "./proxy.js";
 import { startRecorder } from "./recorder.js";
+import { startReplay } from "./replay.js";
 import { setQuiet } from "./util/log.js";
 import { validatePort } from "./util/validate-port.js";
 import { openTrace } from "./viewer.js";
@@ -176,6 +178,30 @@ cli
       } else {
         process.stdout.write(`${formatProfile(result)}\n`);
       }
+      process.exit(0);
+    } catch (err) {
+      process.stderr.write(`${kleur.red("error:")} ${(err as Error).message}\n`);
+      process.exit(1);
+    }
+  });
+
+cli
+  .command("serve", "Replay a .mcptrace as a fake MCP server over stdio")
+  .option("--replay <trace>", "Path to a .mcptrace file to replay")
+  .option("--strict", "Reject unknown methods with -32601 (default)", { default: true })
+  .option("--no-strict", "Return a canned { result: {} } for unknown methods")
+  .option("--quiet", "Suppress informational logs")
+  .action(async (opts) => {
+    setQuiet(!!opts.quiet);
+    if (!opts.replay) {
+      console.error("error: --replay <trace> is required");
+      process.exit(1);
+    }
+    try {
+      // strict defaults to true; --no-strict flips it via cac's negation flag.
+      const handle = await startReplay({ tracePath: opts.replay, strict: opts.strict !== false });
+      // Stay alive until stdin closes — same lifecycle as `proxy` stdio mode.
+      await handle.done;
       process.exit(0);
     } catch (err) {
       process.stderr.write(`${kleur.red("error:")} ${(err as Error).message}\n`);
