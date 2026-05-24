@@ -103,6 +103,33 @@ mcp-devtools serve --replay session.mcptrace --no-strict # canned { result: {} }
 
 Point your client at this command exactly like it would a real MCP server. Identical recorded sessions become deterministic fixtures for CI.
 
+## Quick start — tail mode
+
+Recording a long session in one terminal and want to watch frames stream in from another, without opening the inspector? `tail` is `tail -f` for `.mcptrace`: one tidy line per frame, with a latency hint when a response pairs against a request you've already seen.
+
+```bash
+# Terminal A
+mcp-devtools record --upstream "node ./my-mcp-server.js" --out session.mcptrace
+
+# Terminal B
+mcp-devtools tail session.mcptrace                    # read from start, then follow
+mcp-devtools tail session.mcptrace --from-end         # only show new frames from here on
+mcp-devtools tail session.mcptrace --no-follow        # print existing frames and exit
+```
+
+Output looks like:
+
+```
+14:32:11.482 → initialize#1
+14:32:11.491 ← #1 (9ms)
+14:32:11.503 → tools/list#2
+14:32:11.518 ← #2 (15ms)
+```
+
+Where `→` is the direction arrow and `#1` is the JSON-RPC id of the response that paired with the earlier request.
+
+`→` is client→server, `←` is server→client. Truncations and rotations are handled — if the file shrinks under us, `tail` reopens from byte zero.
+
 ## Features
 
 | | |

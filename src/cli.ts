@@ -9,6 +9,7 @@
  *   diff      compare two .mcptrace files structurally
  *   profile   per-method latency profiler for a .mcptrace file
  *   serve     replay a .mcptrace as a fake MCP server over stdio
+ *   tail      live `tail -f`-style viewer for a .mcptrace
  *   version   print version
  *
  * Global flags:
@@ -22,6 +23,7 @@ import { formatProfile, printProfileJson, profileTrace } from "./profile.js";
 import { startProxy } from "./proxy.js";
 import { startRecorder } from "./recorder.js";
 import { startReplay } from "./replay.js";
+import { createPrinter, tailTrace } from "./tail.js";
 import { setQuiet } from "./util/log.js";
 import { validatePort } from "./util/validate-port.js";
 import { openTrace } from "./viewer.js";
@@ -203,6 +205,41 @@ cli
       // Stay alive until stdin closes — same lifecycle as `proxy` stdio mode.
       await handle.done;
       process.exit(0);
+    } catch (err) {
+      process.stderr.write(`${kleur.red("error:")} ${(err as Error).message}\n`);
+      process.exit(1);
+    }
+  });
+
+cli
+  .command("tail <trace>", "Live `tail -f`-style viewer for a .mcptrace file")
+  .option("--from-start", "Read the trace from the beginning (default)")
+  .option("--from-end", "Skip existing content and only show frames appended after we attach")
+  .option("--no-follow", "Print existing frames and exit instead of following appends")
+  .option("--quiet", "Suppress informational logs")
+  .action(async (tracePath: string, opts) => {
+    setQuiet(!!opts.quiet);
+    // --from-end wins over --from-start when both are passed; --from-start is
+    // the documented default and serves as an explicit opt-in for readability.
+    const since: "start" | "end" = opts.fromEnd ? "end" : "start";
+    // cac's --no-X flips opts.X to false; default is undefined → follow.
+    const follow = opts.follow !== false;
+    try {
+      const print = createPrinter((line) => process.stdout.write(`${line}\n`));
+      const handle = await tailTrace({ path: tracePath, since, follow, onLine: print });
+      if (!follow) {
+        // Initial drain has already run synchronously inside tailTrace; tear
+        // down and exit so the user gets their shell prompt back.
+        await handle.stop();
+        process.exit(0);
+      }
+      // Follow mode: hold the process open, stop cleanly on Ctrl-C.
+      const shutdown = async () => {
+        await handle.stop();
+        process.exit(0);
+      };
+      process.on("SIGINT", shutdown);
+      process.on("SIGTERM", shutdown);
     } catch (err) {
       process.stderr.write(`${kleur.red("error:")} ${(err as Error).message}\n`);
       process.exit(1);
