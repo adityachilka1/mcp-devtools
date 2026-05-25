@@ -8,6 +8,7 @@
  *   doctor    probe an upstream MCP server for spec compliance
  *   diff      compare two .mcptrace files structurally
  *   profile   per-method latency profiler for a .mcptrace file
+ *   summary   one-shot overview combining profile + cost + error breakdown
  *   serve     replay a .mcptrace as a fake MCP server over stdio
  *   tail      live `tail -f`-style viewer for a .mcptrace
  *   version   print version
@@ -23,6 +24,7 @@ import { formatProfile, printProfileJson, profileTrace } from "./profile.js";
 import { startProxy } from "./proxy.js";
 import { startRecorder } from "./recorder.js";
 import { startReplay } from "./replay.js";
+import { formatSummary, printSummaryJson, summarizeTrace } from "./summary.js";
 import { createPrinter, tailTrace } from "./tail.js";
 import { setQuiet } from "./util/log.js";
 import { validatePort } from "./util/validate-port.js";
@@ -179,6 +181,34 @@ cli
         printProfileJson(result);
       } else {
         process.stdout.write(`${formatProfile(result)}\n`);
+      }
+      process.exit(0);
+    } catch (err) {
+      process.stderr.write(`${kleur.red("error:")} ${(err as Error).message}\n`);
+      process.exit(1);
+    }
+  });
+
+cli
+  .command("summary <trace>", "One-shot overview: profile + cost + error breakdown")
+  .option("--model <id>", "Active model id for cost attribution (e.g. gpt-4o-mini)")
+  .option("--pricing-file <path>", "YAML file of per-token rates; overrides the built-in table")
+  .option("--json", "Emit a single JSON envelope to stdout (no colors, no table)")
+  .option("--quiet", "Suppress informational logs")
+  .action(async (tracePath: string, opts) => {
+    // Mirror profile/doctor: --json implies --quiet so the envelope is the
+    // only thing on stdout for `... | jq .` pipelines.
+    setQuiet(!!opts.quiet || !!opts.json);
+    try {
+      const result = await summarizeTrace({
+        tracePath,
+        modelId: opts.model,
+        pricingFile: opts.pricingFile,
+      });
+      if (opts.json) {
+        printSummaryJson(result);
+      } else {
+        process.stdout.write(`${formatSummary(result)}\n`);
       }
       process.exit(0);
     } catch (err) {

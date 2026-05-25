@@ -92,6 +92,24 @@ mcp-devtools profile session.mcptrace
 mcp-devtools profile session.mcptrace --json | jq .
 ```
 
+## Quick start — summary mode
+
+`profile` answers "where did the time go?" — `summary` answers "what happened?" in one screen. Combines the headline profile numbers with an error breakdown and (optionally) a cost estimate, so you can triage a recorded session without flipping between subcommands.
+
+```bash
+mcp-devtools summary session.mcptrace
+mcp-devtools summary session.mcptrace --json | jq .
+mcp-devtools summary session.mcptrace --model gpt-4o-mini
+mcp-devtools summary session.mcptrace --model claude-sonnet-4-6 --pricing-file ./my-prices.yaml
+```
+
+You get:
+
+- Total frames, wall clock, paired requests, and global error count.
+- Top methods by call count with `count / p95 / errorRate` (right-aligned, tabular).
+- Top-3 slowest individual calls.
+- USD cost block when `--model <id>` is passed — identical math to the inspector UI.
+
 ## Quick start — serve mode (replay)
 
 Develop and test MCP clients offline. `serve --replay` reads a `.mcptrace` and impersonates the upstream server over stdio: matching requests get the recorded response (with the client's id substituted in), unknown methods get a clean `-32601` so the client sees a protocol-level failure instead of a hang.
