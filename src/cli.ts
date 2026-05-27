@@ -22,7 +22,7 @@ import { diffFrames, formatDiffReport, readTrace } from "./diff.js";
 import { printResults, printResultsJson, runDoctor } from "./doctor.js";
 import { formatProfile, printProfileJson, profileTrace } from "./profile.js";
 import { startProxy } from "./proxy.js";
-import { startRecorder } from "./recorder.js";
+import { parseSize, startRecorder } from "./recorder.js";
 import { startReplay } from "./replay.js";
 import { formatSummary, printSummaryJson, summarizeTrace } from "./summary.js";
 import { createPrinter, tailTrace } from "./tail.js";
@@ -92,6 +92,11 @@ cli
   .command("record", "Record an MCP session to disk")
   .option("--upstream <cmd>", "Command that launches the upstream MCP server")
   .option("--out <path>", "Output file", { default: "session.mcptrace" })
+  .option(
+    "--rotate <size>",
+    "Rotate the trace when it grows past this size (e.g. '10MB', '500KB', '1GB'). Disabled when omitted.",
+  )
+  .option("--keep <N>", "Maximum number of rotated files to retain", { default: 3 })
   .option("--quiet", "Suppress informational logs")
   .action(async (opts) => {
     setQuiet(!!opts.quiet);
@@ -99,7 +104,26 @@ cli
       console.error("error: --upstream is required");
       process.exit(1);
     }
-    await startRecorder({ upstreamCommand: opts.upstream, outPath: opts.out });
+    let rotateBytes: number | undefined;
+    if (opts.rotate != null) {
+      try {
+        rotateBytes = parseSize(String(opts.rotate));
+      } catch (err) {
+        console.error(`error: ${(err as Error).message}`);
+        process.exit(1);
+      }
+    }
+    const keep = Number(opts.keep);
+    if (!Number.isFinite(keep) || keep <= 0 || !Number.isInteger(keep)) {
+      console.error(`error: --keep must be a positive integer, got ${JSON.stringify(opts.keep)}`);
+      process.exit(1);
+    }
+    await startRecorder({
+      upstreamCommand: opts.upstream,
+      outPath: opts.out,
+      rotateBytes,
+      keep,
+    });
   });
 
 cli

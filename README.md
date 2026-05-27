@@ -83,6 +83,21 @@ mcp-devtools open session.mcptrace      # opens the UI on the recorded trace
 
 `.mcptrace` files are gzipped JSONL — diffable, grep-able, and small.
 
+### Log rotation for long-running sessions
+
+For sessions that may run for hours or days, cap the on-disk footprint with `--rotate <size>` and `--keep <N>`:
+
+```bash
+mcp-devtools record --upstream "node ./my-mcp-server.js" \
+  --out session.mcptrace --rotate 10MB --keep 5
+```
+
+When the active trace grows past `--rotate <size>` (`B`, `KB`, `MB`, `GB` — case-insensitive, e.g. `1024`, `500KB`, `10MB`, `1GB`), the recorder closes the gzip stream cleanly, shifts `session.mcptrace.1 → .2 → .3 …`, renames the active file to `.1`, and reopens a fresh `session.mcptrace`. `--keep <N>` (default `3`) caps how many rotated archives survive; older ones are deleted. Each rotated file is a complete, self-contained gzip archive — `gunzip < session.mcptrace.1` works on its own.
+
+`mcp-devtools tail` already follows rotations: when the active file shrinks, the tail reopens from byte zero, so live monitoring keeps working across rotations.
+
+Size is checked against bytes-fed-to-gzip (pre-compression); the on-disk archive is always smaller since gzip compresses, so `--rotate 10MB` is an upper bound on the *uncompressed* payload per archive.
+
 ## Quick start — profile mode
 
 Recorded a session and want to know where the time went? `profile` reports per-method p50/p95/p99 latency and the slowest individual calls — Chrome DevTools Performance tab, for MCP.
