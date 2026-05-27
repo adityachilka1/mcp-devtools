@@ -125,6 +125,25 @@ You get:
 - Top-3 slowest individual calls.
 - USD cost block when `--model <id>` is passed — identical math to the inspector UI.
 
+## Quick start — cost mode (CI gate)
+
+`summary --model <id>` shows a cost estimate. `cost` is the same number, wired as a CI gate: one line, non-zero exit when you blow the budget.
+
+```bash
+# 0 if under budget, 1 if over, 2 on I/O / config error
+mcp-devtools cost session.mcptrace --model gpt-4o-mini --budget 0.05
+mcp-devtools cost session.mcptrace --model gpt-4o-mini --budget 0.05 --json
+mcp-devtools cost session.mcptrace --model claude-sonnet-4-6 --pricing-file ./my-prices.yaml --budget 1.00
+```
+
+Drop straight into a GitHub Actions step — no `jq`, no shell math:
+
+```yaml
+- run: mcp-devtools cost session.mcptrace --model gpt-4o-mini --budget 0.05
+```
+
+If the active model id isn't in the pricing table (so every `tools/call` resolves to the `unknown-model` basis), the gate is held open even with `--budget 0`. The rule is "we can't measure → don't fail CI" — flipping a build red on a missing model id would punish the wrong person. The human-mode output flags this with an `unknown` / `unable to price` note.
+
 ## Quick start — serve mode (replay)
 
 Develop and test MCP clients offline. `serve --replay` reads a `.mcptrace` and impersonates the upstream server over stdio: matching requests get the recorded response (with the client's id substituted in), unknown methods get a clean `-32601` so the client sees a protocol-level failure instead of a hang.
