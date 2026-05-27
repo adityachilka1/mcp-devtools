@@ -9,6 +9,7 @@
  *   diff      compare two .mcptrace files structurally
  *   profile   per-method latency profiler for a .mcptrace file
  *   summary   one-shot overview combining profile + cost + error breakdown
+ *   cost      focused per-trace cost gate (exits 1 if over --budget)
  *   serve     replay a .mcptrace as a fake MCP server over stdio
  *   tail      live `tail -f`-style viewer for a .mcptrace
  *   version   print version
@@ -18,6 +19,7 @@
  */
 import { cac } from "cac";
 import kleur from "kleur";
+import { formatCostGate, printCostGateJson, runCostGate } from "./cost.js";
 import { diffFrames, formatDiffReport, readTrace } from "./diff.js";
 import { printResults, printResultsJson, runDoctor } from "./doctor.js";
 import { formatProfile, printProfileJson, profileTrace } from "./profile.js";
@@ -238,6 +240,53 @@ cli
     } catch (err) {
       process.stderr.write(`${kleur.red("error:")} ${(err as Error).message}\n`);
       process.exit(1);
+    }
+  });
+
+cli
+  .command("cost <trace>", "Cost gate: priced total for a trace; exit 1 if over --budget")
+  .option("--model <id>", "Active model id for cost attribution (required)")
+  .option("--pricing-file <path>", "YAML file of per-token rates; overrides the built-in table")
+  .option("--budget <usd>", "Fail (exit 1) if the priced total strictly exceeds this many USD")
+  .option("--json", "Emit a single JSON envelope to stdout (no colors, no table)")
+  .option("--quiet", "Suppress informational logs")
+  .action(async (tracePath: string, opts) => {
+    // Mirror profile/summary/doctor: --json implies --quiet so the envelope
+    // is the only thing on stdout for `... | jq .` pipelines.
+    setQuiet(!!opts.quiet || !!opts.json);
+    if (!opts.model) {
+      process.stderr.write(`${kleur.red("error:")} --model <id> is required\n`);
+      process.exit(2);
+    }
+    let budgetUsd: number | undefined;
+    if (opts.budget != null) {
+      const parsed = Number(opts.budget);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        process.stderr.write(
+          `${kleur.red("error:")} --budget must be a non-negative number, got ${JSON.stringify(opts.budget)}\n`,
+        );
+        process.exit(2);
+      }
+      budgetUsd = parsed;
+    }
+    try {
+      const result = await runCostGate({
+        tracePath,
+        modelId: opts.model,
+        pricingFile: opts.pricingFile,
+        budgetUsd,
+      });
+      if (opts.json) {
+        printCostGateJson(result);
+      } else {
+        process.stdout.write(`${formatCostGate(result)}\n`);
+      }
+      // Exit 0 if no budget or under budget; 1 if over.
+      process.exit(result.overBudget ? 1 : 0);
+    } catch (err) {
+      process.stderr.write(`${kleur.red("error:")} ${(err as Error).message}\n`);
+      // I/O or config error (e.g. missing trace, bad YAML, missing model)
+      process.exit(2);
     }
   });
 
