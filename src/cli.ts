@@ -11,6 +11,7 @@
  *   summary   one-shot overview combining profile + cost + error breakdown
  *   cost      focused per-trace cost gate (exits 1 if over --budget)
  *   serve     replay a .mcptrace as a fake MCP server over stdio
+ *   bench     benchmark replay throughput (frames/sec, time to drain)
  *   tail      live `tail -f`-style viewer for a .mcptrace
  *   version   print version
  *
@@ -19,6 +20,7 @@
  */
 import { cac } from "cac";
 import kleur from "kleur";
+import { benchTrace, formatBench, printBenchJson } from "./bench.js";
 import { formatCostGate, printCostGateJson, runCostGate } from "./cost.js";
 import { diffFrames, formatDiffReport, readTrace } from "./diff.js";
 import { printResults, printResultsJson, runDoctor } from "./doctor.js";
@@ -307,6 +309,44 @@ cli
       const handle = await startReplay({ tracePath: opts.replay, strict: opts.strict !== false });
       // Stay alive until stdin closes — same lifecycle as `proxy` stdio mode.
       await handle.done;
+      process.exit(0);
+    } catch (err) {
+      process.stderr.write(`${kleur.red("error:")} ${(err as Error).message}\n`);
+      process.exit(1);
+    }
+  });
+
+cli
+  .command("bench <trace>", "Benchmark replay throughput (frames/sec, time to drain)")
+  .option("--iterations <N>", "Number of measured drain runs", { default: 1 })
+  .option("--warmup <N>", "Number of warmup runs to discard before measuring", { default: 0 })
+  .option("--json", "Emit a single JSON envelope to stdout (no colors, no table)")
+  .option("--quiet", "Suppress informational logs")
+  .action(async (tracePath: string, opts) => {
+    // Mirror profile/summary/cost: --json implies --quiet so the envelope is
+    // the only thing on stdout for `... | jq .` pipelines.
+    setQuiet(!!opts.quiet || !!opts.json);
+    const iterations = Number(opts.iterations);
+    if (!Number.isFinite(iterations) || !Number.isInteger(iterations) || iterations < 1) {
+      process.stderr.write(
+        `${kleur.red("error:")} --iterations must be a positive integer, got ${JSON.stringify(opts.iterations)}\n`,
+      );
+      process.exit(2);
+    }
+    const warmup = Number(opts.warmup);
+    if (!Number.isFinite(warmup) || !Number.isInteger(warmup) || warmup < 0) {
+      process.stderr.write(
+        `${kleur.red("error:")} --warmup must be a non-negative integer, got ${JSON.stringify(opts.warmup)}\n`,
+      );
+      process.exit(2);
+    }
+    try {
+      const result = await benchTrace({ tracePath, iterations, warmup });
+      if (opts.json) {
+        printBenchJson(result);
+      } else {
+        process.stdout.write(`${formatBench(result)}\n`);
+      }
       process.exit(0);
     } catch (err) {
       process.stderr.write(`${kleur.red("error:")} ${(err as Error).message}\n`);

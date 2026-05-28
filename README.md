@@ -144,6 +144,23 @@ Drop straight into a GitHub Actions step — no `jq`, no shell math:
 
 If the active model id isn't in the pricing table (so every `tools/call` resolves to the `unknown-model` basis), the gate is held open even with `--budget 0`. The rule is "we can't measure → don't fail CI" — flipping a build red on a missing model id would punish the wrong person. The human-mode output flags this with an `unknown` / `unable to price` note.
 
+## Quick start — bench mode
+
+Want to know how fast `serve --replay` can drain a trace, and whether a code change regresses that? `bench` runs the same per-frame replay path inside a tight loop and reports throughput.
+
+```bash
+# 1 measured run (default)
+mcp-devtools bench session.mcptrace
+
+# 5 measured runs + 1 warmup run to discard JIT effects
+mcp-devtools bench session.mcptrace --iterations 5 --warmup 1
+
+# JSON envelope for CI / regression tracking
+mcp-devtools bench session.mcptrace --iterations 10 --warmup 2 --json | jq '.median.framesPerSecond'
+```
+
+You get a per-run table (warmup rows are dim and asterisked) and a summary block with `median / p95 / best / worst` for both `durationMs` and `framesPerSecond`. Warmup runs stay visible so you can spot first-iteration penalties, but they don't pollute the summary stats.
+
 ## Quick start — serve mode (replay)
 
 Develop and test MCP clients offline. `serve --replay` reads a `.mcptrace` and impersonates the upstream server over stdio: matching requests get the recorded response (with the client's id substituted in), unknown methods get a clean `-32601` so the client sees a protocol-level failure instead of a hang.
