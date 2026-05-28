@@ -208,3 +208,39 @@ export function collectingWritable(): { stream: Writable; getOutput: () => strin
   });
   return { stream, getOutput: () => buf };
 }
+
+// ── bench entrypoint ─────────────────────────────────────────────────────────
+
+/**
+ * Additive helper for `bench`: programmatically drive one full replay drain
+ * over already-loaded frames, without touching stdio. Returns the frame count
+ * fed to the replay handler so bench can compute frames/sec.
+ *
+ * This is intentionally a thin shim — it reuses `buildIndex` + the same
+ * request/response handling `startReplay` does, but pulls request frames
+ * straight out of the trace instead of waiting on stdin. That keeps the
+ * timed loop tight and the benchmark insensitive to stream/IPC scheduling.
+ *
+ * Additive: no caller in the existing surface depends on this; `startReplay`,
+ * `buildIndex`, `collectingWritable` are untouched. New module only.
+ */
+export function drainOnce(frames: StoredFrame[]): { frameCount: number } {
+  const queues = buildIndex(frames);
+  // Walk the trace's request frames and "answer" each one against the queue.
+  // We discard the response — bench only cares about how fast we can pair.
+  let count = 0;
+  for (const f of frames) {
+    const frame = f.frame as JsonRpcFrame;
+    if ("_parseError" in frame) continue;
+    const hasId = "id" in frame && (frame as { id?: unknown }).id != null;
+    const method = "method" in frame ? (frame as { method?: unknown }).method : undefined;
+    count += 1;
+    if (!hasId || typeof method !== "string") continue;
+    const q = queues.get(method);
+    if (!q) continue;
+    // Shift consumes the response — mirrors the FIFO consumption that
+    // `startReplay.handleFrame` performs on the live wire.
+    q.shift();
+  }
+  return { frameCount: count };
+}
