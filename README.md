@@ -144,6 +144,27 @@ Drop straight into a GitHub Actions step — no `jq`, no shell math:
 
 If the active model id isn't in the pricing table (so every `tools/call` resolves to the `unknown-model` basis), the gate is held open even with `--budget 0`. The rule is "we can't measure → don't fail CI" — flipping a build red on a missing model id would punish the wrong person. The human-mode output flags this with an `unknown` / `unable to price` note.
 
+## Quick start — call mode
+
+Need to fire one tool call against an MCP server from a shell script, a CI step, or a quick local debug session? `call` is the single-shot, non-interactive entry: spawn (or POST to) the upstream, run `initialize → notifications/initialized → tools/call`, print the response, exit.
+
+```bash
+# stdio — spawns the upstream as a child process
+mcp-devtools call echo --upstream "node ./my-mcp-server.js" --args '{"text":"hi"}'
+
+# JSON envelope, jq-friendly
+mcp-devtools call echo --upstream "node ./my-mcp-server.js" --args '{"text":"hi"}' --json | jq '.result'
+
+# HTTP transport — reuses the proxy's streamable-HTTP support
+mcp-devtools call list_repos --transport http --upstream https://example.com/mcp \
+  --header 'Authorization: Bearer ${TOKEN}' --json
+
+# Custom timeout (default 10000ms)
+mcp-devtools call slow_tool --upstream "node ./srv.js" --timeout 30000
+```
+
+Exit codes: `0` on tool success, `1` on a JSON-RPC `error` envelope from the server, `2` on transport / config error (missing `--upstream`, spawn ENOENT, timeout, malformed `--args`). The JSON envelope is `{ toolName, ok, result?, error?, durationMs }` on a single line — pipes cleanly into `jq`.
+
 ## Quick start — bench mode
 
 Want to know how fast `serve --replay` can drain a trace, and whether a code change regresses that? `bench` runs the same per-frame replay path inside a tight loop and reports throughput.

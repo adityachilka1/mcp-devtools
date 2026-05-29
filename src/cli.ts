@@ -21,6 +21,13 @@
 import { cac } from "cac";
 import kleur from "kleur";
 import { benchTrace, formatBench, printBenchJson } from "./bench.js";
+import {
+  type CallOptions,
+  callTool,
+  exitCodeFor,
+  formatCallResultHuman,
+  formatCallResultJson,
+} from "./call.js";
 import { formatCostGate, printCostGateJson, runCostGate } from "./cost.js";
 import { diffFrames, formatDiffReport, readTrace } from "./diff.js";
 import { printResults, printResultsJson, runDoctor } from "./doctor.js";
@@ -77,7 +84,13 @@ cli
 /** Parse `--header 'Name: value'` flags into a header bag. */
 function parseHeaderFlags(raw: unknown): Record<string, string> | undefined {
   if (!raw) return undefined;
-  const list = Array.isArray(raw) ? (raw as string[]) : [String(raw)];
+  // cac with `type: [String]` collects repeats into an array, but it stringifies
+  // a literal `undefined` into the array when the flag is omitted ("undefined"
+  // is what comes through). Drop those alongside empty strings.
+  const list = (Array.isArray(raw) ? (raw as unknown[]) : [raw]).filter(
+    (v) => typeof v === "string" && v.length > 0 && v !== "undefined",
+  ) as string[];
+  if (list.length === 0) return undefined;
   const out: Record<string, string> = {};
   for (const item of list) {
     const idx = item.indexOf(":");
@@ -387,6 +400,76 @@ cli
       process.stderr.write(`${kleur.red("error:")} ${(err as Error).message}\n`);
       process.exit(1);
     }
+  });
+
+cli
+  .command(
+    "call <tool>",
+    "Single-shot tool invocation against an upstream MCP server (non-interactive)",
+  )
+  .option("--upstream <cmd>", "Command (stdio) or URL (http) for the upstream MCP server")
+  .option("--args <json>", "Tool arguments as a JSON object (default '{}')")
+  .option("--transport <type>", "stdio | http", { default: "stdio" })
+  .option("--timeout <ms>", "Per-request timeout in ms", { default: 10_000 })
+  .option(
+    "--header <kv>",
+    "Extra HTTP header for the upstream (http transport). Repeatable. Format: 'Name: value'",
+    { type: [String] },
+  )
+  .option("--json", "Emit a single JSON envelope to stdout (no colors, no per-step lines)")
+  .option("--quiet", "Suppress informational logs")
+  .action(async (tool: string, opts) => {
+    // Mirror the doctor/profile convention — --json implies --quiet so the
+    // envelope is the *only* thing on stdout for `... --json | jq .` pipelines.
+    setQuiet(!!opts.quiet || !!opts.json);
+    if (!opts.upstream) {
+      process.stderr.write(`${kleur.red("error:")} --upstream is required\n`);
+      process.exit(2);
+    }
+    const transport: "stdio" | "http" = opts.transport === "http" ? "http" : "stdio";
+    const timeoutMs = Number(opts.timeout);
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      process.stderr.write(
+        `${kleur.red("error:")} --timeout must be a positive number, got ${JSON.stringify(opts.timeout)}\n`,
+      );
+      process.exit(2);
+    }
+    let parsedArgs: Record<string, unknown> | undefined;
+    if (opts.args != null) {
+      try {
+        const v = JSON.parse(String(opts.args));
+        if (v == null || typeof v !== "object" || Array.isArray(v)) {
+          throw new Error("args must be a JSON object");
+        }
+        parsedArgs = v as Record<string, unknown>;
+      } catch (err) {
+        process.stderr.write(
+          `${kleur.red("error:")} --args must be a JSON object: ${(err as Error).message}\n`,
+        );
+        process.exit(2);
+      }
+    }
+    const httpHeaders = parseHeaderFlags(opts.header);
+    const callOpts: CallOptions = {
+      upstream: opts.upstream,
+      toolName: tool,
+      transport,
+      timeoutMs,
+    };
+    if (parsedArgs !== undefined) callOpts.args = parsedArgs;
+    if (httpHeaders !== undefined) callOpts.headers = httpHeaders;
+
+    if (!opts.json) {
+      process.stdout.write(`Calling ${kleur.bold(tool)}...\n`);
+    }
+    const result = await callTool(callOpts);
+    if (opts.json) {
+      // Single line — jq-friendly.
+      process.stdout.write(`${formatCallResultJson(result)}\n`);
+    } else {
+      process.stdout.write(`${formatCallResultHuman(result)}\n`);
+    }
+    process.exit(exitCodeFor(result));
   });
 
 cli.help();
